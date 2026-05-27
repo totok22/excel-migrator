@@ -31,6 +31,8 @@ from . import _multipart
 
 
 WEB_ROOT = Path(__file__).resolve().parent.parent.parent / "web"
+PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
+DEFAULT_ESF_TEMPLATE = PROJECT_ROOT / "templates" / "fsec_esf_template_2026_v2.2.2.xlsx"
 WORK_ROOT = Path(tempfile.gettempdir()) / "excel-migrator-jobs"
 WORK_ROOT.mkdir(parents=True, exist_ok=True)
 
@@ -188,6 +190,9 @@ class Handler(BaseHTTPRequestHandler):
         if path == "/api/job/download":
             self._api_download(parse_qs(url.query))
             return
+        if path == "/api/default-template":
+            self._send_file(DEFAULT_ESF_TEMPLATE, download_name=DEFAULT_ESF_TEMPLATE.name)
+            return
 
         self._send_json(HTTPStatus.NOT_FOUND, {"error": "not found"})
 
@@ -236,7 +241,9 @@ class Handler(BaseHTTPRequestHandler):
             self._send_json(HTTPStatus.BAD_REQUEST, {"error": f"failed to parse form: {exc}"})
             return
 
-        profile = (form.fields.get("profile") or "generic").strip()
+        raw_profile = (form.fields.get("profile") or "generic").strip()
+        profile = raw_profile if raw_profile in ("generic", "esf") else "generic"
+        use_default_template = form.fields.get("use_default_template") == "1"
         overwrite = form.fields.get("overwrite") == "1"
         no_images = form.fields.get("no_images") == "1"
         keep_template_images = form.fields.get("keep_template_images") == "1"
@@ -265,8 +272,17 @@ class Handler(BaseHTTPRequestHandler):
         source = resolve_input("source")
         template = resolve_input("template")
 
-        if not source or not template:
-            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "缺少旧版文件或新模板"})
+        if profile == "esf" and use_default_template:
+            template = DEFAULT_ESF_TEMPLATE
+
+        if not source:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "缺少旧版文件"})
+            return
+        if not template:
+            self._send_json(HTTPStatus.BAD_REQUEST, {"error": "缺少新模板"})
+            return
+        if not template.exists():
+            self._send_json(HTTPStatus.INTERNAL_SERVER_ERROR, {"error": "内置模板文件不存在"})
             return
 
         out_dir = job.work_dir / "out"
@@ -281,7 +297,7 @@ class Handler(BaseHTTPRequestHandler):
             output=output,
             excel_report=excel_report,
             markdown_report=markdown_report,
-            profile=profile if profile in ("generic", "esf") else "generic",
+            profile=profile,
             overwrite=overwrite,
             include_images=not no_images,
             keep_template_images=keep_template_images,

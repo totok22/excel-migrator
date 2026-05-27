@@ -4,7 +4,7 @@
 
 适用场景：模板升版后，需要把旧版中手动填写的数据搬到新模板里，但手动复制粘贴容易遗漏或破坏格式。
 
-> 由 BITFSAE 车队开发，最初用于 FSC ESF（电气安全表）的版本迁移。
+> 由 BITFSAE 车队开发，最初用于 FSEC ESF（电气安全表）的版本迁移。
 
 ---
 
@@ -35,8 +35,8 @@
 
 ### 使用步骤
 
-1. **选择模式** — 通用模式适用于任意 Excel 模板迁移；FSC ESF 模式额外启用接地表等专用规则
-2. **上传文件** — 拖入或选择「旧版 Excel」和「新版模板」
+1. **选择模式** — 通用模式适用于任意 Excel 模板迁移；FSEC ESF 2026 v2.2.2 模式额外启用内置模板和接地表等专用规则
+2. **上传文件** — 拖入或选择「旧版 Excel」；通用模式需要上传「新版模板」，FSEC ESF 模式可直接使用内置空白模板
 3. **点击开始** — 等待进度条完成
 4. **下载结果** — 下载迁移后的 Excel 和迁移报告
 
@@ -56,7 +56,7 @@ source .venv/bin/activate  # macOS/Linux
 # 运行迁移
 python -m excel_migrator.cli 旧版.xlsx 新模板.xlsx -o 输出.xlsx --report 报告.xlsx
 
-# FSC ESF 模式
+# FSEC ESF 模式
 python -m excel_migrator.cli 旧版.xlsx 新模板.xlsx --profile esf
 ```
 
@@ -97,6 +97,8 @@ excel-migrator/
 ├── start.command            # macOS 启动脚本
 ├── start.sh                 # Linux 启动脚本
 ├── start.bat                # Windows 启动脚本
+├── templates/               # 内置模板
+│   └── fsec_esf_template_2026_v2.2.2.xlsx
 ├── web/                     # 前端（纯 HTML/CSS/JS，无框架）
 │   ├── index.html
 │   ├── style.css
@@ -109,7 +111,7 @@ excel-migrator/
     ├── core.py              # 单元格匹配引擎
     ├── images.py            # 图片迁移
     ├── strict.py            # 模板严格写回
-    ├── profile_esf.py       # FSC ESF 专用规则
+    ├── profile_esf.py       # FSEC ESF 专用规则
     └── report.py            # 报告生成
 ```
 

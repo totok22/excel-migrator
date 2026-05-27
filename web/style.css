@@ -225,6 +225,40 @@ main {
   font-size: 12px;
 }
 
+.template-choice {
+  display: grid;
+  gap: 8px;
+  margin: 0 0 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--bg);
+}
+
+.template-option {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.template-option input {
+  accent-color: var(--accent);
+}
+
+.template-download {
+  width: fit-content;
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+
+.template-download:hover {
+  text-decoration: underline;
+}
+
 .drop-area {
   position: relative;
   background: var(--bg);
@@ -243,6 +277,12 @@ main {
 .drop-area:hover, .drop-area.over {
   border-color: var(--accent);
   background: var(--surface);
+}
+
+.drop-area.disabled {
+  opacity: 0.55;
+  cursor: default;
+  pointer-events: none;
 }
 
 .drop-area.has-file {

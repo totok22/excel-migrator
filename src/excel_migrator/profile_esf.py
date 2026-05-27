@@ -1,4 +1,4 @@
-"""FSC ESF specific migration rules."""
+"""FSEC ESF specific migration rules."""
 
 from __future__ import annotations
 

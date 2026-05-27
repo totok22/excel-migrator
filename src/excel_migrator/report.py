@@ -96,7 +96,7 @@ def _build_summary_sheet(ws: Any, info: ReportInputs) -> None:
     ws.merge_cells("B2:F2")
 
     ws["B3"] = (
-        f"配置：{'FSC ESF 专用' if info.profile == 'esf' else '通用模式'}  "
+        f"配置：{'FSEC ESF 2026 v2.2.2 专用' if info.profile == 'esf' else '通用模式'}  "
         f"｜  覆盖已有内容：{'是' if info.overwrite else '否'}  "
         f"｜  生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  "
         f"｜  耗时：{info.elapsed_seconds:.1f}s"
@@ -233,9 +233,9 @@ def _build_distribution_sheet(ws: Any, info: ReportInputs) -> None:
         "rowcol": "依靠左侧标签 + 段落 + 表头联合命中",
         "table": "依靠段落 + 表头 + 行偏移联合命中",
         "left": "依靠左侧标签命中",
-        "grounding-part": "FSC ESF 接地表 表 1（按部件）",
-        "grounding-carbon-row": "FSC ESF 接地表 表 2（按行序）",
-        "grounding-enclosure-row": "FSC ESF 接地表 表 3（按行序）",
+        "grounding-part": "FSEC ESF 接地表 表 1（按部件）",
+        "grounding-carbon-row": "FSEC ESF 接地表 表 2（按行序）",
+        "grounding-enclosure-row": "FSEC ESF 接地表 表 3（按行序）",
     }
     by_method = Counter(a.method for a in info.cell_actions)
     r = method_start + 1
@@ -327,7 +327,7 @@ def write_markdown_summary(md_path: Path, info: ReportInputs) -> None:
     lines: list[str] = []
     lines.append("# Excel 迁移摘要")
     lines.append("")
-    lines.append(f"- 配置：{'FSC ESF 专用' if info.profile == 'esf' else '通用模式'}")
+    lines.append(f"- 配置：{'FSEC ESF 2026 v2.2.2 专用' if info.profile == 'esf' else '通用模式'}")
     lines.append(f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
     lines.append(f"- 耗时：{info.elapsed_seconds:.1f}s")
     lines.append(f"- 旧版来源：`{info.source_path}`")

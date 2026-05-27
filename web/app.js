@@ -2,14 +2,41 @@
   const $ = (id) => document.getElementById(id);
   const state = { files: { source: null, template: null }, profile: "generic" };
 
+  function useDefaultTemplate() {
+    const selected = document.querySelector('input[name="template-mode"]:checked');
+    return state.profile === "esf" && selected && selected.value === "default";
+  }
+
+  function updateTemplateUi() {
+    const choice = $("template-choice");
+    const area = document.querySelector('.drop-area[data-target="template"]');
+    const titleHint = document.querySelector(".file-upload:nth-child(2) .file-hint");
+    const defaultMode = useDefaultTemplate();
+
+    choice.classList.toggle("hidden", state.profile !== "esf");
+    area.classList.toggle("disabled", defaultMode);
+    if (titleHint) {
+      titleHint.textContent = defaultMode ? "（默认使用内置模板，可改为上传）" : "（空白的标准模板）";
+    }
+  }
+
   // Mode selection
   document.querySelectorAll('input[name="profile"]').forEach((inp) => {
     inp.addEventListener("change", () => {
       state.profile = inp.value;
+      if (state.profile === "esf") {
+        const defaultTemplate = document.querySelector('input[name="template-mode"][value="default"]');
+        if (defaultTemplate) defaultTemplate.checked = true;
+      }
       document.querySelectorAll(".mode-card").forEach((el) => {
         el.classList.toggle("active", el.querySelector("input").checked);
       });
+      updateTemplateUi();
     });
+  });
+
+  document.querySelectorAll('input[name="template-mode"]').forEach((inp) => {
+    inp.addEventListener("change", updateTemplateUi);
   });
 
   // Sliders
@@ -52,20 +79,22 @@
   // Run
   $("run-btn").addEventListener("click", async () => {
     const status = $("status-text");
+    const defaultTemplate = useDefaultTemplate();
     if (!state.files.source) { status.textContent = "请选择旧版文件"; status.style.color = "var(--danger)"; return; }
-    if (!state.files.template) { status.textContent = "请选择新版模板"; status.style.color = "var(--danger)"; return; }
+    if (!defaultTemplate && !state.files.template) { status.textContent = "请选择新版模板"; status.style.color = "var(--danger)"; return; }
 
     status.textContent = "上传中…";
     status.style.color = "var(--text-secondary)";
 
     const fd = new FormData();
     fd.set("profile", state.profile);
+    fd.set("use_default_template", defaultTemplate ? "1" : "0");
     fd.set("overwrite", $("overwrite").checked ? "1" : "0");
     fd.set("no_images", $("no-images").checked ? "1" : "0");
     fd.set("keep_template_images", $("keep-template-images").checked ? "1" : "0");
     fd.set("markdown", "0");
     fd.set("source", state.files.source);
-    fd.set("template", state.files.template);
+    if (!defaultTemplate) fd.set("template", state.files.template);
     fd.set("context_threshold", $("context-threshold").value);
     fd.set("fuzzy_threshold", $("fuzzy-threshold").value);
     fd.set("image_margin", $("image-margin").value);
@@ -138,4 +167,6 @@
       .map((f) => `<a class="dl-btn" href="/api/job/download?job_id=${encodeURIComponent(jobId)}&key=${encodeURIComponent(f.key)}" download="${f.filename}">${f.name}</a>`)
       .join("");
   }
+
+  updateTemplateUi();
 })();

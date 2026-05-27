@@ -16,7 +16,7 @@ def _progress(stage: str, current: int, total: int) -> None:
 def parse_args(argv: list[str]) -> argparse.Namespace:
     p = argparse.ArgumentParser(
         prog="excel-migrator",
-        description="把旧 Excel 内容迁移到新模板。默认通用模式，可加 --profile esf 启用 FSC ESF 专用规则。",
+        description="把旧 Excel 内容迁移到新模板。默认通用模式，可加 --profile esf 启用 FSEC ESF 专用规则。",
     )
     p.add_argument("source", help="旧版 Excel 文件路径")
     p.add_argument("template", help="新版模板 Excel 路径")

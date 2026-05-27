@@ -152,7 +152,7 @@ def migrate_images_generic(
     """Copy images from old workbook to new workbook by anchor.
 
     custom_targeter(source_ws, target_ws, img) -> str | anchor | None:
-    special target coord or copied anchor (used by FSC ESF profile).
+    special target coord or copied anchor (used by FSEC ESF profile).
     """
     actions: list[ImageAction] = []
     skipped: list[SkippedImage] = []

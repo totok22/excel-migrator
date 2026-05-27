@@ -117,7 +117,7 @@ def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> Migration
     formula_fixes: list[str] = []
 
     if opts.profile == "esf":
-        emit("处理 FSC ESF 接地表", 3, 8)
+        emit("处理 FSEC ESF 接地表", 3, 8)
         cell_actions.extend(migrate_grounding(source_wb, target_wb, opts.overwrite))
         skip_sheets |= ESF_SKIP_SHEETS
         formula_fixes.extend(fix_known_template_formula_breaks(target_wb))
