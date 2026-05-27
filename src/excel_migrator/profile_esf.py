@@ -127,14 +127,18 @@ def migrate_grounding(source_wb: Any, target_wb: Any, overwrite: bool) -> list[C
     return actions
 
 
-def grounding_image_targeter(source_ws: Any, target_ws: Any, source_img: Any) -> str | None:
-    """Targets used by image migration for the 接地 Grounding sheet."""
+def grounding_image_targeter(source_ws: Any, target_ws: Any, source_img: Any) -> Any | str | None:
+    """Targets used by image migration for ESF sheets."""
     from .images import image_anchor_start
+
+    row, col = image_anchor_start(source_img)
+
+    if source_ws.title == "备用电池箱 Spare Accumulator":
+        return _spare_accumulator_image_anchor(source_img, row, col)
 
     if source_ws.title != "接地 Grounding":
         return None
 
-    row, col = image_anchor_start(source_img)
     if col == 3:
         cell = _existing(source_ws, row, 1)
         part = norm_text(cell.value if cell is not None else None)
@@ -162,6 +166,37 @@ def grounding_image_targeter(source_ws: Any, target_ws: Any, source_img: Any) ->
             idx = used.index(row)
             if idx < len(target_rows):
                 return f"M{target_rows[idx]}"
+    return None
+
+
+def _shift_image_anchor_rows(source_img: Any, delta: int, *, min_start_row: int | None = None,
+                             max_end_row: int | None = None) -> Any:
+    anchor = copy.deepcopy(source_img.anchor)
+    start = getattr(anchor, "_from", None)
+    if start is not None:
+        start.row += delta
+        if min_start_row is not None:
+            start.row = max(start.row, min_start_row - 1)
+
+    end = getattr(anchor, "to", None)
+    if end is not None:
+        end.row += delta
+        if max_end_row is not None:
+            end.row = min(end.row, max_end_row - 1)
+    return anchor
+
+
+def _spare_accumulator_image_anchor(source_img: Any, row: int, col: int) -> Any | None:
+    """Move old spare-accumulator picture anchors onto the shifted 2026 template blocks."""
+    # The 2026 Spare Accumulator template moved the picture blocks down while the
+    # old workbooks keep images anchored to the earlier rows. Preserve each
+    # image's relative columns/offsets so side-by-side pictures stay side-by-side.
+    if 11 <= row <= 30 and 39 <= col <= 44:
+        return _shift_image_anchor_rows(source_img, 12, min_start_row=23, max_end_row=43)
+    if 34 <= row <= 53 and 1 <= col <= 53:
+        return _shift_image_anchor_rows(source_img, 12, min_start_row=47, max_end_row=65)
+    if 66 <= row <= 84 and 1 <= col <= 17:
+        return _shift_image_anchor_rows(source_img, 12, min_start_row=78, max_end_row=96)
     return None
 
 

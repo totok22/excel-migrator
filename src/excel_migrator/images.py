@@ -41,6 +41,13 @@ def anchor_label(img: Any) -> str:
     return f"{get_column_letter(col)}{row}"
 
 
+def anchor_start_label(anchor: Any) -> str:
+    marker = getattr(anchor, "_from", None)
+    if marker is None:
+        return "?"
+    return f"{get_column_letter(marker.col + 1)}{marker.row + 1}"
+
+
 def image_bytes(img: Any) -> bytes:
     if hasattr(img, "_data"):
         return img._data()
@@ -144,8 +151,8 @@ def migrate_images_generic(
 ) -> tuple[list[ImageAction], list[SkippedImage]]:
     """Copy images from old workbook to new workbook by anchor.
 
-    custom_targeter(source_ws, target_ws, img) -> str | None: special target coord
-    (used by FSC ESF profile for the grounding sheet).
+    custom_targeter(source_ws, target_ws, img) -> str | anchor | None:
+    special target coord or copied anchor (used by FSC ESF profile).
     """
     actions: list[ImageAction] = []
     skipped: list[SkippedImage] = []
@@ -162,9 +169,14 @@ def migrate_images_generic(
                 ta = None
                 if custom_targeter is not None:
                     ta = custom_targeter(source_ws, target_ws, img)
-                if ta:
+                if isinstance(ta, str) and ta:
                     add_image_copy(target_ws, img, img.anchor, fit_coord=ta)
                     actions.append(ImageAction(source_ws.title, sa, ta, "fit-cell", f"{img.width}x{img.height}"))
+                elif ta:
+                    add_image_copy(target_ws, img, ta)
+                    actions.append(
+                        ImageAction(source_ws.title, sa, anchor_start_label(ta), "custom-anchor", f"{img.width}x{img.height}")
+                    )
                 else:
                     add_image_copy(target_ws, img, img.anchor)
                     actions.append(ImageAction(source_ws.title, sa, sa, "same-anchor", f"{img.width}x{img.height}"))
