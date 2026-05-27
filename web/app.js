@@ -135,7 +135,7 @@
     ].map((k) => `<div class="kpi"><div class="val">${k.v}</div><div class="lbl">${k.l}</div></div>`).join("");
 
     $("downloads").innerHTML = (d.downloads || [])
-      .map((f) => `<a class="dl-btn" href="/api/job/download?job_id=${encodeURIComponent(jobId)}&key=${encodeURIComponent(f.key)}" download="${f.filename}">⬇ ${f.name}</a>`)
+      .map((f) => `<a class="dl-btn" href="/api/job/download?job_id=${encodeURIComponent(jobId)}&key=${encodeURIComponent(f.key)}" download="${f.filename}">${f.name}</a>`)
       .join("");
   }
 })();
