@@ -139,6 +139,18 @@ def _remove_child(root: ET.Element, tag_name: str) -> None:
             root.remove(ch)
 
 
+def _drop_printer_settings_ref(root: ET.Element) -> None:
+    """Remove printerSettings relationships that are not preserved in staging.
+
+    openpyxl does not write the legacy printerSettings binary parts. If we keep
+    a template pageSetup r:id while writing the staging package relationships,
+    Excel sees a dangling relationship and refuses to open the workbook.
+    """
+    page_setup = root.find("main:pageSetup", NS)
+    if page_setup is not None:
+        page_setup.attrib.pop(f"{{{OFFICE_REL_NS}}}id", None)
+
+
 def _insert_child(root: ET.Element, child: ET.Element, before_tags: tuple[str, ...]) -> None:
     before = {f"{{{SHEET_NS}}}{tag}" for tag in before_tags}
     for idx, existing in enumerate(list(root)):
@@ -166,6 +178,8 @@ def _strict_worksheet_xml(template_xml: bytes, staging_xml: bytes) -> tuple[byte
 
     for tag in ("hyperlinks", "drawing", "legacyDrawing"):
         _remove_child(template_root, tag)
+
+    _drop_printer_settings_ref(template_root)
 
     s_hyper = staging_root.find("main:hyperlinks", NS)
     if s_hyper is not None:
