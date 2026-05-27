@@ -253,7 +253,7 @@ def _insert_child(root: ET.Element, child: ET.Element, before_tags: tuple[str, .
     root.append(child)
 
 
-def _strict_worksheet_xml(template_xml: bytes, staging_xml: bytes) -> tuple[bytes, int]:
+def _strict_worksheet_xml(template_xml: bytes, staging_xml: bytes, shared_strings: list[str] | None = None) -> tuple[bytes, int]:
     template_root = ET.fromstring(template_xml)
     staging_root = ET.fromstring(staging_xml)
 
@@ -268,6 +268,30 @@ def _strict_worksheet_xml(template_xml: bytes, staging_xml: bytes) -> tuple[byte
         ref = tcell.attrib.get("r")
         if ref and _patch_cell(tcell, staging_cells.get(ref)):
             patched += 1
+
+    # Convert any remaining t='s' (shared string) cells to inlineStr.
+    # The output uses staging's package which has no sharedStrings.xml,
+    # so shared string indices from the template would be dangling references.
+    if shared_strings is not None:
+        for tcell in template_root.findall("main:sheetData/main:row/main:c", NS):
+            if tcell.attrib.get("t") == "s":
+                v_elem = tcell.find(f"{{{SHEET_NS}}}v")
+                if v_elem is not None and v_elem.text is not None:
+                    try:
+                        idx = int(v_elem.text)
+                        text = shared_strings[idx] if idx < len(shared_strings) else ""
+                    except (ValueError, IndexError):
+                        text = ""
+                    # Convert to inlineStr
+                    tcell.remove(v_elem)
+                    tcell.attrib["t"] = "inlineStr"
+                    is_elem = ET.SubElement(tcell, f"{{{SHEET_NS}}}is")
+                    t_elem = ET.SubElement(is_elem, f"{{{SHEET_NS}}}t")
+                    t_elem.text = text
+                    patched += 1
+                else:
+                    # No value - just remove the 't' attribute
+                    tcell.attrib.pop("t", None)
 
     for tag in ("hyperlinks", "drawing", "legacyDrawing"):
         _remove_child(template_root, tag)
@@ -308,6 +332,91 @@ def _fix_drawing_xml(data: bytes) -> bytes:
     return _BARE_AVLST_RE.sub(b"<a:avLst />", data)
 
 
+def _load_shared_strings(zf: ZipFile) -> list[str] | None:
+    """Load the shared strings table from an xlsx ZIP file."""
+    if "xl/sharedStrings.xml" not in zf.namelist():
+        return None
+    root = ET.fromstring(zf.read("xl/sharedStrings.xml"))
+    strings: list[str] = []
+    for si in root.findall(f"{{{SHEET_NS}}}si"):
+        # <si> can contain <t>text</t> or <r><t>text</t></r> (rich text)
+        t_elem = si.find(f"{{{SHEET_NS}}}t")
+        if t_elem is not None:
+            strings.append(t_elem.text or "")
+        else:
+            # Rich text: concatenate all <r><t> elements
+            parts = []
+            for r in si.findall(f"{{{SHEET_NS}}}r"):
+                rt = r.find(f"{{{SHEET_NS}}}t")
+                if rt is not None:
+                    parts.append(rt.text or "")
+            strings.append("".join(parts))
+    return strings
+
+
+def _dedup_styles(styles_xml: bytes) -> tuple[bytes, dict[int, int]]:
+    """Deduplicate cellXfs entries in styles.xml and return a remapping dict.
+
+    WPS-authored templates often contain duplicate cellXfs entries. Excel
+    considers this repairable and deduplicates on open, triggering a repair
+    prompt. We do it proactively to avoid the prompt.
+
+    Returns (new_styles_xml, remap) where remap maps old_index -> new_index.
+    """
+    root = ET.fromstring(styles_xml)
+    cellXfs = root.find(f"{{{SHEET_NS}}}cellXfs")
+    if cellXfs is None:
+        return styles_xml, {}
+
+    xf_list = list(cellXfs)
+    if not xf_list:
+        return styles_xml, {}
+
+    # Serialize each xf to detect duplicates
+    seen: dict[bytes, int] = {}  # serialized -> new_index
+    remap: dict[int, int] = {}  # old_index -> new_index
+    keep: list[ET.Element] = []
+
+    for old_idx, xf in enumerate(xf_list):
+        key = ET.tostring(xf)
+        if key in seen:
+            remap[old_idx] = seen[key]
+        else:
+            new_idx = len(keep)
+            seen[key] = new_idx
+            remap[old_idx] = new_idx
+            keep.append(xf)
+
+    if len(keep) == len(xf_list):
+        # No duplicates found
+        return styles_xml, {}
+
+    # Rebuild cellXfs with deduplicated entries
+    cellXfs.clear()
+    cellXfs.attrib["count"] = str(len(keep))
+    for xf in keep:
+        cellXfs.append(xf)
+
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True), remap
+
+
+def _remap_style_indices(worksheet_xml: bytes, remap: dict[int, int]) -> bytes:
+    """Remap cell style indices (s attribute) in worksheet XML after style dedup."""
+    if not remap:
+        return worksheet_xml
+
+    root = ET.fromstring(worksheet_xml)
+    for cell in root.findall(f"{{{SHEET_NS}}}sheetData/{{{SHEET_NS}}}row/{{{SHEET_NS}}}c"):
+        s = cell.attrib.get("s")
+        if s is not None:
+            old_idx = int(s)
+            new_idx = remap.get(old_idx, old_idx)
+            if new_idx != old_idx:
+                cell.attrib["s"] = str(new_idx)
+
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
 def build_strict_output(template_path: Path, staging_path: Path, output_path: Path) -> tuple[int, list[str]]:
     template_sheets = workbook_sheet_paths(template_path)
     staging_sheets = workbook_sheet_paths(staging_path)
@@ -323,12 +432,24 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
     with ZipFile(template_path) as template_zip, ZipFile(staging_path) as staging_zip, ZipFile(
         output_path, "w", ZIP_DEFLATED, compresslevel=ZIP_LEVEL
     ) as out_zip:
+        # Load template's shared strings for converting t='s' cells
+        template_shared_strings = _load_shared_strings(template_zip)
+
         for info in staging_zip.infolist():
             data = staging_zip.read(info.filename)
             template_sheet_path = sheet_paths.get(info.filename)
             if template_sheet_path:
-                data, sheet_patched = _strict_worksheet_xml(template_zip.read(template_sheet_path), data)
+                data, sheet_patched = _strict_worksheet_xml(
+                    template_zip.read(template_sheet_path), data, template_shared_strings
+                )
                 patched += sheet_patched
+            elif info.filename == "xl/styles.xml":
+                # Use template's styles.xml (worksheet XML uses template style indices)
+                if "xl/styles.xml" in template_zip.namelist():
+                    data = template_zip.read("xl/styles.xml")
+            elif info.filename == "xl/theme/theme1.xml":
+                if "xl/theme/theme1.xml" in template_zip.namelist():
+                    data = template_zip.read("xl/theme/theme1.xml")
             elif info.filename == "xl/workbook.xml":
                 data, name_fixes = _repair_workbook_defined_names(data)
             elif info.filename.startswith("xl/drawings/") and info.filename.endswith(".xml"):
