@@ -212,11 +212,28 @@ main {
   gap: 16px;
 }
 
+.file-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+  height: 24px;
+  overflow: hidden;
+}
+
 .file-title {
   font-size: 14px;
   font-weight: 600;
-  margin-bottom: 8px;
   color: var(--text);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.file-upload > .file-title {
+  margin-bottom: 8px;
 }
 
 .file-hint {
@@ -225,32 +242,32 @@ main {
   font-size: 12px;
 }
 
-.template-choice {
-  display: grid;
-  gap: 8px;
-  margin: 0 0 10px;
-  padding: 10px 12px;
-  border: 1px solid var(--border);
-  border-radius: var(--radius);
-  background: var(--bg);
+.template-actions {
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  min-width: 126px;
+  flex-shrink: 0;
 }
 
-.template-option {
-  display: flex;
+.template-toggle {
+  display: inline-flex;
   align-items: center;
-  gap: 8px;
-  font-size: 13px;
+  gap: 5px;
+  font-size: 12px;
+  font-weight: 500;
   color: var(--text);
   cursor: pointer;
 }
 
-.template-option input {
+.template-toggle input {
   accent-color: var(--accent);
 }
 
 .template-download {
-  width: fit-content;
   font-size: 12px;
+  font-weight: 500;
   color: var(--accent);
   text-decoration: none;
 }
@@ -268,10 +285,11 @@ main {
   text-align: center;
   transition: all 0.2s;
   cursor: pointer;
-  min-height: 120px;
+  height: 120px;
   display: flex;
   align-items: center;
   justify-content: center;
+  overflow: hidden;
 }
 
 .drop-area:hover, .drop-area.over {
@@ -317,7 +335,11 @@ main {
   color: var(--text);
   display: flex;
   align-items: center;
+  justify-content: center;
   gap: 4px;
+  max-width: 100%;
+  min-height: 40px;
+  overflow-wrap: anywhere;
 }
 
 /* Options */

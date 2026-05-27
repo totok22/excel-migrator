@@ -3,20 +3,34 @@
   const state = { files: { source: null, template: null }, profile: "generic" };
 
   function useDefaultTemplate() {
-    const selected = document.querySelector('input[name="template-mode"]:checked');
-    return state.profile === "esf" && selected && selected.value === "default";
+    const toggle = $("use-default-template");
+    return state.profile === "esf" && toggle && toggle.checked;
   }
 
   function updateTemplateUi() {
-    const choice = $("template-choice");
+    const actions = $("template-actions");
     const area = document.querySelector('.drop-area[data-target="template"]');
-    const titleHint = document.querySelector(".file-upload:nth-child(2) .file-hint");
+    const placeholder = area.querySelector(".drop-placeholder");
+    const info = $("template-info");
     const defaultMode = useDefaultTemplate();
 
-    choice.classList.toggle("hidden", state.profile !== "esf");
+    actions.classList.toggle("hidden", state.profile !== "esf");
     area.classList.toggle("disabled", defaultMode);
-    if (titleHint) {
-      titleHint.textContent = defaultMode ? "（默认使用内置模板，可改为上传）" : "（空白的标准模板）";
+    if (defaultMode) {
+      area.classList.add("has-file");
+      placeholder.classList.add("hidden");
+      info.classList.remove("hidden");
+      info.textContent = "✓ 内置 FSEC ESF 2026 v2.2.2 空白模板";
+    } else if (state.files.template) {
+      area.classList.add("has-file");
+      placeholder.classList.add("hidden");
+      info.classList.remove("hidden");
+      info.textContent = `✓ ${state.files.template.name} (${(state.files.template.size / 1048576).toFixed(1)} MB)`;
+    } else {
+      area.classList.remove("has-file");
+      placeholder.classList.remove("hidden");
+      info.classList.add("hidden");
+      info.textContent = "";
     }
   }
 
@@ -25,7 +39,7 @@
     inp.addEventListener("change", () => {
       state.profile = inp.value;
       if (state.profile === "esf") {
-        const defaultTemplate = document.querySelector('input[name="template-mode"][value="default"]');
+        const defaultTemplate = $("use-default-template");
         if (defaultTemplate) defaultTemplate.checked = true;
       }
       document.querySelectorAll(".mode-card").forEach((el) => {
@@ -35,9 +49,7 @@
     });
   });
 
-  document.querySelectorAll('input[name="template-mode"]').forEach((inp) => {
-    inp.addEventListener("change", updateTemplateUi);
-  });
+  $("use-default-template").addEventListener("change", updateTemplateUi);
 
   // Sliders
   ["context-threshold", "fuzzy-threshold", "image-margin"].forEach((id) => {
@@ -57,10 +69,15 @@
 
     function setFile(f) {
       state.files[field] = f;
+      if (field === "template") {
+        const defaultTemplate = $("use-default-template");
+        if (defaultTemplate) defaultTemplate.checked = false;
+      }
       area.classList.add("has-file");
       placeholder.classList.add("hidden");
       info.classList.remove("hidden");
       info.textContent = `✓ ${f.name} (${(f.size / 1048576).toFixed(1)} MB)`;
+      if (field === "template") updateTemplateUi();
     }
 
     input.addEventListener("change", () => { if (input.files[0]) setFile(input.files[0]); });
