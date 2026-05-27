@@ -71,6 +71,23 @@ def _build_caches(wb: Any) -> dict[str, SheetCache]:
     return {ws.title: SheetCache(ws) for ws in wb.worksheets}
 
 
+def _normalize_output_for_excel(path: Path) -> None:
+    """Rewrite the workbook package once so Office Excel accepts the output."""
+    wb = load_workbook(path)
+    normalized: Path | None = None
+    try:
+        with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmpf:
+            normalized = Path(tmpf.name)
+        wb.save(normalized)
+    finally:
+        wb.close()
+    try:
+        normalized.replace(path)
+    finally:
+        if normalized is not None and normalized.exists():
+            normalized.unlink()
+
+
 def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> MigrationResult:
     started = time.perf_counter()
 
@@ -143,6 +160,7 @@ def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> Migration
         target_wb.save(staging)
         strict_patched, name_fixes = build_strict_output(opts.template, staging, opts.output)
         formula_fixes.extend(name_fixes)
+        _normalize_output_for_excel(opts.output)
     finally:
         if staging.exists():
             staging.unlink()
