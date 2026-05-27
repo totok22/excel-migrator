@@ -8,6 +8,7 @@ intact and lets us trim empty rows that openpyxl introduced.
 from __future__ import annotations
 
 import copy
+import re
 import shutil
 import tempfile
 import xml.etree.ElementTree as ET
@@ -131,6 +132,208 @@ def empty_row_numbers(xlsx_path: Path, sheet_path: str) -> set[int]:
         if not row.findall("main:c", NS):
             rows.add(int(row.attrib["r"]))
     return rows
+
+
+_CELL_REF_RE = re.compile(r"([A-Z]+)([0-9]+)")
+
+
+def _col_to_index(col: str) -> int:
+    idx = 0
+    for ch in col:
+        idx = idx * 26 + (ord(ch) - ord("A") + 1)
+    return idx
+
+
+def _cell_sort_key(ref: str) -> tuple[int, int]:
+    match = _CELL_REF_RE.fullmatch(ref)
+    if not match:
+        return (0, 0)
+    col, row = match.groups()
+    return (int(row), _col_to_index(col))
+
+
+def _is_empty_style_cell(cell: ET.Element) -> bool:
+    return not _value_children(cell)
+
+
+def _remap_layout_style_attrs(root: ET.Element, style_remap: dict[int, int]) -> None:
+    if not style_remap:
+        return
+    for col in root.findall("main:cols/main:col", NS):
+        style = col.attrib.get("style")
+        if style is not None:
+            col.attrib["style"] = str(style_remap.get(int(style), int(style)))
+    for row in root.findall("main:sheetData/main:row", NS):
+        style = row.attrib.get("s")
+        if style is not None:
+            row.attrib["s"] = str(style_remap.get(int(style), int(style)))
+
+
+def _restore_empty_cells_xml(
+    reference_xml: bytes,
+    workbook_xml: bytes,
+    layout_xml: bytes | None = None,
+    style_remap: dict[int, int] | None = None,
+) -> tuple[bytes, int]:
+    reference_root = ET.fromstring(reference_xml)
+    workbook_root = ET.fromstring(workbook_xml)
+    layout_root = ET.fromstring(layout_xml) if layout_xml is not None else reference_root
+    if style_remap:
+        _remap_layout_style_attrs(layout_root, style_remap)
+
+    ref_cols = layout_root.find("main:cols", NS)
+    workbook_cols = workbook_root.find("main:cols", NS)
+    if workbook_cols is not None:
+        workbook_root.remove(workbook_cols)
+    if ref_cols is not None:
+        sheet_data_pos = next(
+            (idx for idx, child in enumerate(list(workbook_root)) if child.tag == f"{{{SHEET_NS}}}sheetData"),
+            len(list(workbook_root)),
+        )
+        workbook_root.insert(sheet_data_pos, copy.deepcopy(ref_cols))
+
+    sheet_data = workbook_root.find("main:sheetData", NS)
+    reference_sheet_data = reference_root.find("main:sheetData", NS)
+    if sheet_data is None or reference_sheet_data is None:
+        return workbook_xml, 0
+
+    layout_sheet_data = layout_root.find("main:sheetData", NS)
+    layout_rows_by_number = {
+        row.attrib.get("r"): row
+        for row in (layout_sheet_data.findall("main:row", NS) if layout_sheet_data is not None else [])
+        if row.attrib.get("r")
+    }
+    for row in sheet_data.findall("main:row", NS):
+        row_num = row.attrib.get("r")
+        ref_row = layout_rows_by_number.get(row_num)
+        if ref_row is not None:
+            row.attrib.clear()
+            row.attrib.update(ref_row.attrib)
+
+    existing = {
+        cell.attrib.get("r")
+        for cell in sheet_data.findall("main:row/main:c", NS)
+        if cell.attrib.get("r")
+    }
+
+    rows_by_number = {
+        row.attrib.get("r"): row
+        for row in sheet_data.findall("main:row", NS)
+        if row.attrib.get("r")
+    }
+
+    restored = 0
+    for ref_row in reference_sheet_data.findall("main:row", NS):
+        row_num = ref_row.attrib.get("r")
+        if not row_num:
+            continue
+        row = rows_by_number.get(row_num)
+        if row is None:
+            row = copy.deepcopy(layout_rows_by_number.get(row_num, ref_row))
+            for cell in list(row):
+                row.remove(cell)
+            for cell in ref_row.findall("main:c", NS):
+                row.append(copy.deepcopy(cell))
+            for cell in list(row):
+                if not _is_empty_style_cell(cell):
+                    row.remove(cell)
+            if not list(row):
+                continue
+            sheet_data.append(row)
+            rows_by_number[row_num] = row
+            restored += len(row.findall("main:c", NS))
+            continue
+
+        added = False
+        for ref_cell in ref_row.findall("main:c", NS):
+            ref = ref_cell.attrib.get("r")
+            if not ref or ref in existing or not _is_empty_style_cell(ref_cell):
+                continue
+            row.append(copy.deepcopy(ref_cell))
+            existing.add(ref)
+            restored += 1
+            added = True
+        if added:
+            cells = sorted(row.findall("main:c", NS), key=lambda c: _cell_sort_key(c.attrib.get("r", "")))
+            for cell in list(row):
+                row.remove(cell)
+            for cell in cells:
+                row.append(cell)
+
+    if not restored:
+        return workbook_xml, 0
+
+    rows = sorted(sheet_data.findall("main:row", NS), key=lambda r: int(r.attrib.get("r", "0")))
+    for row in list(sheet_data):
+        sheet_data.remove(row)
+    for row in rows:
+        sheet_data.append(row)
+
+    return _ensure_ignorable_ns_declared(
+        ET.tostring(workbook_root, encoding="utf-8", xml_declaration=True)
+    ), restored
+
+
+def restore_empty_cells_from_reference(
+    reference_path: Path,
+    workbook_path: Path,
+    layout_path: Path | None = None,
+) -> int:
+    """Restore empty style-only cells dropped by workbook normalization."""
+    reference_sheets = workbook_sheet_paths(reference_path)
+    workbook_sheets = workbook_sheet_paths(workbook_path)
+    layout_sheets = workbook_sheet_paths(layout_path) if layout_path else reference_sheets
+    sheet_paths = {
+        workbook_sheets[name]: reference_sheets[name]
+        for name in workbook_sheets
+        if name in reference_sheets
+    }
+    layout_sheet_paths = {
+        workbook_sheets[name]: layout_sheets[name]
+        for name in workbook_sheets
+        if name in layout_sheets
+    }
+
+    style_remap: dict[int, int] = {}
+    if layout_path:
+        with ZipFile(layout_path) as layout_zip:
+            if "xl/styles.xml" in layout_zip.namelist():
+                _, style_remap, _ = _dedup_styles(layout_zip.read("xl/styles.xml"))
+
+    with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmpf:
+        temp_path = Path(tmpf.name)
+    restored = 0
+    try:
+        with ZipFile(reference_path) as ref_zip, ZipFile(workbook_path) as src, ZipFile(
+            temp_path, "w", ZIP_DEFLATED, compresslevel=ZIP_LEVEL
+        ) as dst:
+            layout_zip_ctx = ZipFile(layout_path) if layout_path else None
+            try:
+                for info in src.infolist():
+                    data = src.read(info.filename)
+                    ref_sheet_path = sheet_paths.get(info.filename)
+                    if ref_sheet_path:
+                        layout_xml = (
+                            layout_zip_ctx.read(layout_sheet_paths[info.filename])
+                            if layout_zip_ctx is not None and info.filename in layout_sheet_paths
+                            else None
+                        )
+                        data, count = _restore_empty_cells_xml(
+                            ref_zip.read(ref_sheet_path),
+                            data,
+                            layout_xml=layout_xml,
+                            style_remap=style_remap,
+                        )
+                        restored += count
+                    dst.writestr(info, data)
+            finally:
+                if layout_zip_ctx is not None:
+                    layout_zip_ctx.close()
+        shutil.move(str(temp_path), workbook_path)
+    finally:
+        if temp_path.exists():
+            temp_path.unlink()
+    return restored
 
 
 def extra_empty_rows_not_in_template(template_path: Path, workbook_path: Path) -> dict[str, set[int]]:

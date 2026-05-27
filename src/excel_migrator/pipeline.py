@@ -26,7 +26,7 @@ from .profile_esf import (
     migrate_grounding,
 )
 from .report import ReportInputs, write_excel_report, write_markdown_summary
-from .strict import build_strict_output, extra_empty_rows_not_in_template
+from .strict import build_strict_output, extra_empty_rows_not_in_template, restore_empty_cells_from_reference
 
 
 ProgressFn = Callable[[str, int, int], None]
@@ -71,7 +71,7 @@ def _build_caches(wb: Any) -> dict[str, SheetCache]:
     return {ws.title: SheetCache(ws) for ws in wb.worksheets}
 
 
-def _normalize_output_for_excel(path: Path) -> None:
+def _normalize_output_for_excel(path: Path, template_path: Path) -> None:
     """Rewrite the workbook package once so Office Excel accepts the output."""
     wb = load_workbook(path)
     normalized: Path | None = None
@@ -81,6 +81,7 @@ def _normalize_output_for_excel(path: Path) -> None:
         wb.save(normalized)
     finally:
         wb.close()
+    restore_empty_cells_from_reference(path, normalized, layout_path=template_path)
     try:
         normalized.replace(path)
     finally:
@@ -160,7 +161,7 @@ def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> Migration
         target_wb.save(staging)
         strict_patched, name_fixes = build_strict_output(opts.template, staging, opts.output)
         formula_fixes.extend(name_fixes)
-        _normalize_output_for_excel(opts.output)
+        _normalize_output_for_excel(opts.output, opts.template)
     finally:
         if staging.exists():
             staging.unlink()
