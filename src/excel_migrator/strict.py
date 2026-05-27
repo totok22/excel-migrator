@@ -354,67 +354,98 @@ def _load_shared_strings(zf: ZipFile) -> list[str] | None:
     return strings
 
 
-def _dedup_styles(styles_xml: bytes) -> tuple[bytes, dict[int, int]]:
-    """Deduplicate cellXfs entries in styles.xml and return a remapping dict.
-
-    WPS-authored templates often contain duplicate cellXfs entries. Excel
-    considers this repairable and deduplicates on open, triggering a repair
-    prompt. We do it proactively to avoid the prompt.
-
-    Returns (new_styles_xml, remap) where remap maps old_index -> new_index.
-    """
-    root = ET.fromstring(styles_xml)
-    cellXfs = root.find(f"{{{SHEET_NS}}}cellXfs")
-    if cellXfs is None:
-        return styles_xml, {}
-
-    xf_list = list(cellXfs)
-    if not xf_list:
-        return styles_xml, {}
-
-    # Serialize each xf to detect duplicates
-    seen: dict[bytes, int] = {}  # serialized -> new_index
-    remap: dict[int, int] = {}  # old_index -> new_index
+def _dedup_style_children(parent: ET.Element) -> tuple[dict[int, int], int]:
+    children = list(parent)
+    seen: dict[bytes, int] = {}
+    remap: dict[int, int] = {}
     keep: list[ET.Element] = []
 
-    for old_idx, xf in enumerate(xf_list):
-        key = ET.tostring(xf)
+    for old_idx, child in enumerate(children):
+        key = ET.tostring(child)
         if key in seen:
             remap[old_idx] = seen[key]
         else:
             new_idx = len(keep)
             seen[key] = new_idx
             remap[old_idx] = new_idx
-            keep.append(xf)
+            keep.append(child)
 
-    if len(keep) == len(xf_list):
-        # No duplicates found
-        return styles_xml, {}
+    if len(keep) == len(children):
+        return remap, 0
 
-    # Rebuild cellXfs with deduplicated entries
-    cellXfs.clear()
-    cellXfs.attrib["count"] = str(len(keep))
-    for xf in keep:
-        cellXfs.append(xf)
-
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True), remap
+    parent.clear()
+    parent.attrib["count"] = str(len(keep))
+    for child in keep:
+        parent.append(child)
+    return remap, len(children) - len(keep)
 
 
-def _remap_style_indices(worksheet_xml: bytes, remap: dict[int, int]) -> bytes:
-    """Remap cell style indices (s attribute) in worksheet XML after style dedup."""
+def _remap_xf_attr(root: ET.Element, attr: str, remap: dict[int, int]) -> None:
     if not remap:
+        return
+    for path in ("main:cellXfs/main:xf", "main:cellStyleXfs/main:xf"):
+        for xf in root.findall(path, NS):
+            value = xf.attrib.get(attr)
+            if value is None:
+                continue
+            old_idx = int(value)
+            xf.attrib[attr] = str(remap.get(old_idx, old_idx))
+
+
+def _dedup_styles(styles_xml: bytes) -> tuple[bytes, dict[int, int], dict[int, int]]:
+    """Deduplicate style tables and return cell/differential style remaps.
+
+    WPS-authored templates often contain duplicate cellXfs entries. Excel
+    considers this repairable and deduplicates on open, triggering a repair
+    prompt. Fonts can be duplicated too; remapping fontId before deduplicating
+    cellXfs catches style-equivalent entries that are not byte-identical at
+    first pass. Differential styles are deduplicated with a separate dxfId remap.
+
+    Returns (new_styles_xml, cell_style_remap, dxf_remap).
+    """
+    root = ET.fromstring(styles_xml)
+
+    fonts = root.find(f"{{{SHEET_NS}}}fonts")
+    if fonts is not None:
+        font_remap, _ = _dedup_style_children(fonts)
+        _remap_xf_attr(root, "fontId", font_remap)
+
+    dxf_remap: dict[int, int] = {}
+    dxfs = root.find(f"{{{SHEET_NS}}}dxfs")
+    if dxfs is not None:
+        dxf_remap, _ = _dedup_style_children(dxfs)
+
+    cellXfs = root.find(f"{{{SHEET_NS}}}cellXfs")
+    if cellXfs is None:
+        return ET.tostring(root, encoding="utf-8", xml_declaration=True), {}, dxf_remap
+
+    style_remap, _ = _dedup_style_children(cellXfs)
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True), style_remap, dxf_remap
+
+
+def _remap_style_indices(worksheet_xml: bytes, style_remap: dict[int, int], dxf_remap: dict[int, int]) -> bytes:
+    """Remap worksheet style indices after style table deduplication."""
+    if not style_remap and not dxf_remap:
         return worksheet_xml
 
     root = ET.fromstring(worksheet_xml)
-    for cell in root.findall(f"{{{SHEET_NS}}}sheetData/{{{SHEET_NS}}}row/{{{SHEET_NS}}}c"):
-        s = cell.attrib.get("s")
-        if s is not None:
-            old_idx = int(s)
-            new_idx = remap.get(old_idx, old_idx)
-            if new_idx != old_idx:
-                cell.attrib["s"] = str(new_idx)
+    if style_remap:
+        for cell in root.findall(f"{{{SHEET_NS}}}sheetData/{{{SHEET_NS}}}row/{{{SHEET_NS}}}c"):
+            s = cell.attrib.get("s")
+            if s is not None:
+                old_idx = int(s)
+                cell.attrib["s"] = str(style_remap.get(old_idx, old_idx))
 
-    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    if dxf_remap:
+        for rule in root.findall(f".//{{{SHEET_NS}}}cfRule"):
+            dxf_id = rule.attrib.get("dxfId")
+            if dxf_id is not None:
+                old_idx = int(dxf_id)
+                rule.attrib["dxfId"] = str(dxf_remap.get(old_idx, old_idx))
+
+    return _ensure_ignorable_ns_declared(
+        ET.tostring(root, encoding="utf-8", xml_declaration=True)
+    )
 
 
 def build_strict_output(template_path: Path, staging_path: Path, output_path: Path) -> tuple[int, list[str]]:
@@ -434,6 +465,11 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
     ) as out_zip:
         # Load template's shared strings for converting t='s' cells
         template_shared_strings = _load_shared_strings(template_zip)
+        style_remap: dict[int, int] = {}
+        dxf_remap: dict[int, int] = {}
+        styles_data: bytes | None = None
+        if "xl/styles.xml" in template_zip.namelist():
+            styles_data, style_remap, dxf_remap = _dedup_styles(template_zip.read("xl/styles.xml"))
 
         for info in staging_zip.infolist():
             data = staging_zip.read(info.filename)
@@ -442,11 +478,12 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
                 data, sheet_patched = _strict_worksheet_xml(
                     template_zip.read(template_sheet_path), data, template_shared_strings
                 )
+                data = _remap_style_indices(data, style_remap, dxf_remap)
                 patched += sheet_patched
             elif info.filename == "xl/styles.xml":
                 # Use template's styles.xml (worksheet XML uses template style indices)
-                if "xl/styles.xml" in template_zip.namelist():
-                    data = template_zip.read("xl/styles.xml")
+                if styles_data is not None:
+                    data = styles_data
             elif info.filename == "xl/theme/theme1.xml":
                 if "xl/theme/theme1.xml" in template_zip.namelist():
                     data = template_zip.read("xl/theme/theme1.xml")
