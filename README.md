@@ -4,7 +4,7 @@
 
 适用场景：模板升版后，需要把旧版中手动填写的数据搬到新模板里，但手动复制粘贴容易遗漏或破坏格式。
 
-> 由 [BITFSAE](https://github.com/totok22) 车队开发，最初用于 FSC ESF（电气安全表）的版本迁移。
+> 由 BITFSAE 车队开发，最初用于 FSC ESF（电气安全表）的版本迁移。
 
 ---
 
@@ -188,4 +188,4 @@ Web 界面中点击「高级设置」可调整：
 
 ## License
 
-[MIT](LICENSE) © 2025 totok22 / BITFSAE
+[MIT](LICENSE) © 2026 totok22 / BITFSAE
