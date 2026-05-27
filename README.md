@@ -14,7 +14,7 @@
 
 | 条件 | 说明 |
 |------|------|
-| **Python 3.10+** | [下载地址](https://www.python.org/downloads/)。macOS 可用 `brew install python`，Windows 推荐从官网安装并勾选 "Add to PATH" |
+| **Python 3.10+** | [下载地址](https://www.python.org/downloads/)。macOS 可用 `brew install python`，Windows 推荐从官网安装并勾选 "Add python.exe to PATH" |
 | **网络连接** | 仅首次启动时需要（自动安装 `openpyxl` 和 `Pillow` 两个依赖） |
 
 不需要安装 Excel，不需要管理员权限。
@@ -175,6 +175,10 @@ Web 界面中点击「高级设置」可调整：
 **Q: 可以反复运行吗？**
 
 可以。每次运行都是从原始模板重新生成，不会累积错误。
+
+**Q: Windows 双击 `start.bat` 提示找不到 `py` 或 Python？**
+
+`start.bat` 会依次尝试 `py -3`、`python`、`python3`。如果都不可用，请从 [Python 官网](https://www.python.org/downloads/) 安装 Python 3.10+，并在安装界面勾选 **Add python.exe to PATH**。安装后重新打开 `start.bat` 即可。
 
 ---
 
