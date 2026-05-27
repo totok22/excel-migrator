@@ -2,12 +2,13 @@
 
 from __future__ import annotations
 
+import copy
 from typing import Any
 
 from openpyxl.cell.cell import MergedCell
 from openpyxl.utils import get_column_letter
 
-from .core import CellAction, copyable_value, is_input_cell, norm_text
+from .core import CellAction, copyable_value, hyperlink_target_from_value, is_input_cell, norm_text
 
 
 def _existing(ws: Any, row: int, col: int) -> Any:
@@ -49,6 +50,11 @@ def _copy_if_possible(source_ws: Any, target_ws: Any, src_coord: str, tgt_coord:
         if _is_warning_value(s.value):
             return
         t.value = s.value
+        if s.hyperlink:
+            t._hyperlink = copy.copy(s.hyperlink)
+            t._hyperlink.ref = t.coordinate
+        else:
+            t.hyperlink = hyperlink_target_from_value(s.value)
         actions.append(CellAction(target_ws.title, s.coordinate, t.coordinate, method, s.value))
 
 

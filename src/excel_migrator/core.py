@@ -43,6 +43,7 @@ RULE_WORDS = (
 _NORM_STRIP = re.compile(r"[，。；：、,;:/\\()\[\]{}<>\"'“”‘’\-_\s]+")
 _NORM_NUMERIC = re.compile(r"(ev|t|cn|cnonly)?[\d\.]+")
 _NORM_WS = re.compile(r"\s+")
+_URL_RE = re.compile(r"https?://[^\s]+", re.IGNORECASE)
 
 # ---- Runtime configuration (set by pipeline before migration) ----
 
@@ -149,6 +150,14 @@ def norm_text(value: Any) -> str:
 def safe_preview(value: Any, limit: int = 80) -> str:
     text = repr(value)
     return text if len(text) <= limit else text[: limit - 3] + "..."
+
+
+def hyperlink_target_from_value(value: Any) -> str | None:
+    """Return a clickable URL when a migrated value is a plain-text link."""
+    if not isinstance(value, str):
+        return None
+    match = _URL_RE.search(value.strip())
+    return match.group(0) if match else None
 
 
 # ------------------------- data classes -------------------------
@@ -404,6 +413,9 @@ def _copy_cell_value(source: Any, target: Any) -> None:
     target.value = source.value
     if source.hyperlink:
         target._hyperlink = copy.copy(source.hyperlink)
+        target._hyperlink.ref = target.coordinate
+    else:
+        target.hyperlink = hyperlink_target_from_value(source.value)
     if source.comment:
         target.comment = copy.copy(source.comment)
 
