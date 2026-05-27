@@ -113,8 +113,6 @@ def _run_job(job: Job, opts: MigrationOptions) -> None:
             "output": str(result.output),
             "excel_report": str(result.excel_report),
         }
-        if result.markdown_report:
-            job.result_paths["markdown_report"] = str(result.markdown_report)
         job.emit({
             "type": "done",
             "filled": len(result.cell_actions),
@@ -124,9 +122,7 @@ def _run_job(job: Job, opts: MigrationOptions) -> None:
             "downloads": [
                 {"name": "新版输出 Excel", "key": "output", "filename": opts.output.name},
                 {"name": "迁移报告 (Excel)", "key": "excel_report", "filename": opts.excel_report.name},
-            ] + ([
-                {"name": "迁移摘要 (Markdown)", "key": "markdown_report", "filename": opts.markdown_report.name}
-            ] if opts.markdown_report else []),
+            ],
         })
     except Exception:
         tb = traceback.format_exc()
@@ -247,7 +243,6 @@ class Handler(BaseHTTPRequestHandler):
         overwrite = form.fields.get("overwrite") == "1"
         no_images = form.fields.get("no_images") == "1"
         keep_template_images = form.fields.get("keep_template_images") == "1"
-        emit_markdown = form.fields.get("markdown") == "1"
 
         # Advanced settings
         def _float(key: str, default: float) -> float:
@@ -289,14 +284,12 @@ class Handler(BaseHTTPRequestHandler):
         out_dir.mkdir(exist_ok=True)
         output = out_dir / (source.stem + "_migrated.xlsx")
         excel_report = out_dir / (source.stem + "_迁移报告.xlsx")
-        markdown_report = out_dir / (source.stem + "_迁移摘要.md") if emit_markdown else None
 
         opts = MigrationOptions(
             source=source,
             template=template,
             output=output,
             excel_report=excel_report,
-            markdown_report=markdown_report,
             profile=profile,
             overwrite=overwrite,
             include_images=not no_images,

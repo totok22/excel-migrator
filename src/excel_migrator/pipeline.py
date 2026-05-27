@@ -25,7 +25,7 @@ from .profile_esf import (
     grounding_image_targeter,
     migrate_grounding,
 )
-from .report import ReportInputs, write_excel_report, write_markdown_summary
+from .report import ReportInputs, write_excel_report
 from .strict import build_strict_output, extra_empty_rows_not_in_template, restore_empty_cells_from_reference
 
 
@@ -38,7 +38,6 @@ class MigrationOptions:
     template: Path
     output: Path
     excel_report: Path
-    markdown_report: Path | None = None
     profile: str = "generic"  # "generic" | "esf"
     overwrite: bool = False
     include_images: bool = True
@@ -56,7 +55,6 @@ class MigrationOptions:
 class MigrationResult:
     output: Path
     excel_report: Path
-    markdown_report: Path | None
     cell_actions: list[CellAction] = field(default_factory=list)
     skipped_cells: list[SkippedCell] = field(default_factory=list)
     image_actions: list[ImageAction] = field(default_factory=list)
@@ -189,13 +187,10 @@ def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> Migration
         remaining_extra_empty_rows=remaining_extra,
     )
     write_excel_report(opts.excel_report, info)
-    if opts.markdown_report:
-        write_markdown_summary(opts.markdown_report, info)
 
     return MigrationResult(
         output=opts.output,
         excel_report=opts.excel_report,
-        markdown_report=opts.markdown_report,
         cell_actions=cell_actions,
         skipped_cells=skipped_cells,
         image_actions=image_actions,

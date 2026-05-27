@@ -1,8 +1,6 @@
 """Build human-friendly migration reports.
 
-Two outputs:
-- Excel report (.xlsx): multi-sheet, KPI-first, color-coded, links to source.
-- Markdown summary (.md): concise overview suitable for quick review or Git.
+Output: Excel report (.xlsx) — multi-sheet, KPI-first, color-coded.
 """
 
 from __future__ import annotations
@@ -310,54 +308,3 @@ def _build_fixes_sheet(ws: Any, info: ReportInputs) -> None:
         ws.cell(row=row, column=1, value=f"{skip.sheet}!{skip.anchor}").border = BORDER
         ws.cell(row=row, column=2, value=skip.reason).border = BORDER
         row += 1
-
-
-# ---- markdown summary ------------------------------------------------------
-
-def write_markdown_summary(md_path: Path, info: ReportInputs) -> None:
-    filled = len(info.cell_actions)
-    skipped = len(info.skipped_cells)
-    total = filled + skipped if (filled + skipped) else 1
-    coverage = filled / total * 100
-
-    by_sheet_filled = Counter(a.sheet for a in info.cell_actions)
-    by_sheet_skipped = Counter(s.sheet for s in info.skipped_cells)
-    sheets = sorted(set(by_sheet_filled) | set(by_sheet_skipped))
-
-    lines: list[str] = []
-    lines.append("# Excel 迁移摘要")
-    lines.append("")
-    lines.append(f"- 配置：{'FSEC ESF 2026 v2.2.2 专用' if info.profile == 'esf' else '通用模式'}")
-    lines.append(f"- 生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}")
-    lines.append(f"- 耗时：{info.elapsed_seconds:.1f}s")
-    lines.append(f"- 旧版来源：`{info.source_path}`")
-    lines.append(f"- 新版模板：`{info.template_path}`")
-    lines.append(f"- 输出文件：`{info.output_path}`")
-    lines.append("")
-    lines.append("## 关键指标")
-    lines.append("")
-    lines.append(f"- 已自动填充：**{filled}**")
-    lines.append(f"- 需人工确认：**{skipped}**")
-    lines.append(f"- 覆盖率：**{coverage:.0f}%**")
-    lines.append(f"- 已迁移图片：{len(info.image_actions)}（未迁移 {len(info.skipped_images)}）")
-    lines.append(f"- 模板公式修复：{len(info.formula_fixes)}")
-    lines.append("")
-    lines.append("## 按 Sheet 分布")
-    lines.append("")
-    lines.append("| Sheet | 已填充 | 需人工确认 | 覆盖率 |")
-    lines.append("|---|---|---|---|")
-    for sheet in sheets:
-        f = by_sheet_filled.get(sheet, 0)
-        s = by_sheet_skipped.get(sheet, 0)
-        t = f + s if (f + s) else 1
-        lines.append(f"| {sheet} | {f} | {s} | {f/t*100:.0f}% |")
-    lines.append("")
-    if info.skipped_cells:
-        lines.append("## 需人工确认（前 50 条）")
-        lines.append("")
-        for s in info.skipped_cells[:50]:
-            lines.append(f"- `{s.sheet}!{s.coord}` — {s.reason}")
-        if len(info.skipped_cells) > 50:
-            lines.append(f"- ...等共 {len(info.skipped_cells)} 条，详见 Excel 报告。")
-    md_path.parent.mkdir(parents=True, exist_ok=True)
-    md_path.write_text("\n".join(lines) + "\n", encoding="utf-8")

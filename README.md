@@ -117,7 +117,6 @@ positional:
 options:
   -o, --output          输出路径（默认：旧文件名_migrated.xlsx）
   -r, --report          Excel 报告路径
-  -m, --markdown        Markdown 摘要路径
   --profile {generic,esf}
   --overwrite           覆盖模板中已有的非占位内容
   --no-images           跳过图片迁移
