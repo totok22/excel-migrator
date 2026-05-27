@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Excel Migrator</title>
+  <link rel="stylesheet" href="/web/style.css" />
+</head>
+<body>
+  <div class="app">
+    <header>
+      <div class="header-content">
+        <div class="header-left">
+          <div class="header-icon">⚡</div>
+          <div>
+            <h1>Excel Migrator</h1>
+            <p>旧版 Excel → 新模板，自动迁移内容</p>
+          </div>
+        </div>
+        <a class="github-link" href="https://github.com/totok22/excel-migrator" target="_blank" rel="noopener">GitHub</a>
+      </div>
+    </header>
+
+    <main>
+      <!-- Step 1: Mode -->
+      <section class="step">
+        <div class="step-header">
+          <span class="step-num">1</span>
+          <h2>选择模式</h2>
+        </div>
+        <div class="mode-grid">
+          <label class="mode-card active">
+            <input type="radio" name="profile" value="generic" checked />
+            <div class="mode-icon">📄</div>
+            <div class="mode-info">
+              <strong>通用模式</strong>
+              <span>适用于任意 Excel 模板的版本迁移</span>
+            </div>
+          </label>
+          <label class="mode-card">
+            <input type="radio" name="profile" value="esf" />
+            <div class="mode-icon">🔋</div>
+            <div class="mode-info">
+              <strong>FSC ESF 专用</strong>
+              <span>电气安全表专用规则（接地表、图片对齐）</span>
+            </div>
+          </label>
+        </div>
+      </section>
+
+      <!-- Step 2: Files -->
+      <section class="step">
+        <div class="step-header">
+          <span class="step-num">2</span>
+          <h2>上传文件</h2>
+        </div>
+        <div class="file-grid">
+          <div class="file-upload">
+            <div class="file-title">旧版 Excel <span class="file-hint">（已填充内容的）</span></div>
+            <div class="drop-area" data-target="source">
+              <input type="file" id="source-file" accept=".xlsx" />
+              <div class="drop-placeholder">
+                <div class="drop-icon">📁</div>
+                <div>点击选择或拖入 .xlsx 文件</div>
+              </div>
+              <div class="drop-selected hidden" id="source-info"></div>
+            </div>
+          </div>
+          <div class="file-upload">
+            <div class="file-title">新版模板 <span class="file-hint">（空白模板）</span></div>
+            <div class="drop-area" data-target="template">
+              <input type="file" id="template-file" accept=".xlsx" />
+              <div class="drop-placeholder">
+                <div class="drop-icon">📁</div>
+                <div>点击选择或拖入 .xlsx 文件</div>
+              </div>
+              <div class="drop-selected hidden" id="template-info"></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Step 3: Options -->
+      <section class="step">
+        <div class="step-header">
+          <span class="step-num">3</span>
+          <h2>配置</h2>
+        </div>
+        <div class="options-row">
+          <label class="opt"><input type="checkbox" id="overwrite" /> 覆盖已有内容</label>
+          <label class="opt"><input type="checkbox" id="no-images" /> 跳过图片</label>
+          <label class="opt"><input type="checkbox" id="keep-template-images" /> 保留模板图片</label>
+        </div>
+
+        <details class="advanced">
+          <summary>高级设置</summary>
+          <div class="adv-content">
+            <div class="adv-row">
+              <div class="adv-item">
+                <label>上下文匹配阈值 <span class="adv-val" id="context-threshold-val">0.55</span></label>
+                <input type="range" id="context-threshold" min="0.3" max="0.9" step="0.05" value="0.55" />
+              </div>
+              <div class="adv-item">
+                <label>模糊匹配阈值 <span class="adv-val" id="fuzzy-threshold-val">0.70</span></label>
+                <input type="range" id="fuzzy-threshold" min="0.4" max="0.9" step="0.05" value="0.70" />
+              </div>
+              <div class="adv-item">
+                <label>图片边距 <span class="adv-val" id="image-margin-val">0.92</span></label>
+                <input type="range" id="image-margin" min="0.75" max="0.98" step="0.01" value="0.92" />
+              </div>
+            </div>
+            <div class="adv-toggles">
+              <label><input type="checkbox" id="filter-status" checked /> 过滤状态值 (Warning/OK)</label>
+              <label><input type="checkbox" id="keep-instructional" checked /> 保留指导性文字</label>
+              <label><input type="checkbox" id="cross-sheet" /> 允许跨子表匹配（实验性）</label>
+            </div>
+          </div>
+        </details>
+      </section>
+
+      <!-- Run -->
+      <div class="run-section">
+        <button id="run-btn" class="run-btn">开始迁移</button>
+        <span class="run-status" id="status-text"></span>
+      </div>
+
+      <!-- Progress -->
+      <section class="step hidden" id="progress-section">
+        <div class="progress-bar"><div class="progress-fill" id="progress-fill"></div></div>
+        <div class="progress-info" id="progress-stage">准备中…</div>
+        <pre class="log-output" id="log"></pre>
+      </section>
+
+      <!-- Result -->
+      <section class="step result hidden" id="result-section">
+        <div class="result-header">✅ 迁移完成</div>
+        <div class="result-kpis" id="kpi-row"></div>
+        <div class="result-downloads" id="downloads"></div>
+      </section>
+    </main>
+
+    <footer>
+      <span>本地运行 · 文件不离开你的电脑 · <a href="https://github.com/totok22/excel-migrator">BITFSAE</a></span>
+    </footer>
+  </div>
+
+  <script src="/web/app.js"></script>
+</body>
+</html>
