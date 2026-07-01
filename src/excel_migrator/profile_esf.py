@@ -215,4 +215,4 @@ def fix_known_template_formula_breaks(wb: Any) -> list[str]:
     return fixes
 
 
-ESF_SKIP_SHEETS = {"接地 Grounding"}
+ESF_SKIP_SHEETS = {"接地 Grounding", "修订历史 Revision"}

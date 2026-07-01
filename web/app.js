@@ -41,6 +41,10 @@
       if (state.profile === "esf") {
         const defaultTemplate = $("use-default-template");
         if (defaultTemplate) defaultTemplate.checked = true;
+        const noImages = $("no-images");
+        if (noImages) noImages.checked = false;
+        const keepTemplateImages = $("keep-template-images");
+        if (keepTemplateImages) keepTemplateImages.checked = true;
       }
       document.querySelectorAll(".mode-card").forEach((el) => {
         el.classList.toggle("active", el.querySelector("input").checked);

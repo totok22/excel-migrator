@@ -295,10 +295,6 @@ def restore_empty_cells_from_reference(
     }
 
     style_remap: dict[int, int] = {}
-    if layout_path:
-        with ZipFile(layout_path) as layout_zip:
-            if "xl/styles.xml" in layout_zip.namelist():
-                _, style_remap, _ = _dedup_styles(layout_zip.read("xl/styles.xml"))
 
     with tempfile.NamedTemporaryFile(suffix=".xlsx", delete=False) as tmpf:
         temp_path = Path(tmpf.name)
@@ -668,11 +664,10 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
     ) as out_zip:
         # Load template's shared strings for converting t='s' cells
         template_shared_strings = _load_shared_strings(template_zip)
-        style_remap: dict[int, int] = {}
         dxf_remap: dict[int, int] = {}
         styles_data: bytes | None = None
         if "xl/styles.xml" in template_zip.namelist():
-            styles_data, style_remap, dxf_remap = _dedup_styles(template_zip.read("xl/styles.xml"))
+            styles_data = template_zip.read("xl/styles.xml")
 
         for info in staging_zip.infolist():
             data = staging_zip.read(info.filename)
@@ -681,7 +676,7 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
                 data, sheet_patched = _strict_worksheet_xml(
                     template_zip.read(template_sheet_path), data, template_shared_strings
                 )
-                data = _remap_style_indices(data, style_remap, dxf_remap)
+                data = _remap_style_indices(data, {}, dxf_remap)
                 patched += sheet_patched
             elif info.filename == "xl/styles.xml":
                 # Use template's styles.xml (worksheet XML uses template style indices)

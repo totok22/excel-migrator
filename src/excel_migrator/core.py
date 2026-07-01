@@ -463,25 +463,25 @@ def _context_match(src: SheetCache, src_cell: Any, dst: SheetCache, dst_cell: An
 
 
 def clear_target_placeholders(wb: Any) -> int:
-    """Clear placeholder text from input cells, but PRESERVE instructional text.
+    """Keep target placeholder text available as the template baseline.
 
-    Instructional text (e.g. image placement hints) stays in the template so
-    that cells that don't get filled retain their guidance text.
+    The strict writer already preserves template cells that are not patched with
+    migrated values. Keeping placeholders in the in-memory target lets migration
+    distinguish old template boilerplate from real user-entered content.
     """
-    cleared = 0
-    for ws in wb.worksheets:
-        for cell in [c for _, c in sorted(ws._cells.items())]:
-            if isinstance(cell, MergedCell):
-                continue
-            if is_input_cell(cell) and not is_formula(cell.value) and is_placeholder(cell.value):
-                # Keep instructional text - only clear truly empty placeholders
-                if _config.keep_instructional and is_instructional(cell.value):
-                    continue
-                cell.value = None
-                cell._hyperlink = None
-                cell.comment = None
-                cleared += 1
-    return cleared
+    return 0
+
+
+def _looks_like_template_default(source_value: Any, target_value: Any) -> bool:
+    if not isinstance(source_value, str) or not isinstance(target_value, str):
+        return False
+    if not source_value.strip() or not target_value.strip():
+        return False
+    if not (is_placeholder(target_value) or is_instructional(target_value)):
+        return False
+    src = norm_text(source_value)
+    dst = norm_text(target_value)
+    return _fuzzy_text_match(src, dst)
 
 
 def build_source_index(
@@ -531,6 +531,8 @@ def migrate_generic_cells(
             if scell is not None and is_input_cell(scell) and copyable_value(scell):
                 if _config.filter_status and is_status_value(scell.value):
                     continue
+                if _looks_like_template_default(scell.value, tcell.value):
+                    continue
                 if _context_match(source, scell, target, tcell):
                     _copy_cell_value(scell, tcell)
                     actions.append(CellAction(title, scell.coordinate, tcell.coordinate, "same-coordinate", scell.value))
@@ -556,6 +558,7 @@ def migrate_generic_cells(
                 candidates = [c for _, c in index.get(k, [])
                               if copyable_value(c)
                               and not (_config.filter_status and is_status_value(c.value))
+                              and not _looks_like_template_default(c.value, tcell.value)
                               and (title, c.coordinate) not in used_sources]
                 if len(candidates) == 1:
                     match = candidates[0]
@@ -580,6 +583,8 @@ def migrate_generic_cells(
                         if (title, scell.coordinate) in used_sources:
                             continue
                         if _config.filter_status and is_status_value(scell.value):
+                            continue
+                        if _looks_like_template_default(scell.value, tcell.value):
                             continue
                         s_label = source.left_label(scell.row, scell.column)
                         if t_label and s_label and _fuzzy_text_match(t_label, s_label):

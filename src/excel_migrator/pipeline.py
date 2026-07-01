@@ -159,7 +159,6 @@ def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> Migration
         target_wb.save(staging)
         strict_patched, name_fixes = build_strict_output(opts.template, staging, opts.output)
         formula_fixes.extend(name_fixes)
-        _normalize_output_for_excel(opts.output, opts.template)
     finally:
         if staging.exists():
             staging.unlink()
