@@ -4,7 +4,7 @@
 
 > 由 BITFSAE 车队开发，最初用于 FSEC ESF（电气安全表）的版本迁移。
 
----
+
 
 ## 项目结构
 
@@ -22,7 +22,7 @@ web/                 # 纯 HTML/CSS/JS 前端，无框架
 templates/           # 内置空白模板
 ```
 
----
+
 
 ## 快速开始
 
@@ -36,35 +36,33 @@ templates/           # 内置空白模板
 
 启动后浏览器自动打开 `http://127.0.0.1:8765/`。所有处理在本地完成，文件不会上传到任何服务器。
 
----
+
 
 ## 模式
 
 - **通用模式（generic）**
 
-适用于结构相近、且用 `#FFFFCC99` 底色标记可填写区域的模板升版迁移。依赖 sheet 名、坐标、标签、表头、段落标题和文本相似度匹配。新旧文件需要是"模板升版"关系，即 sheet 和字段标签大体对应。
+  适用于结构相近、且用 `#FFFFCC99` 底色标记可填写区域的模板升版迁移。依赖 sheet 名、坐标、标签、表头、段落标题和文本相似度匹配。新旧文件需要是"模板升版"关系，即 sheet 和字段标签大体对应。
 
-未来要支持更多模板风格，可能的扩展方向：
+  未来要支持更多模板风格，可能的扩展方向：
 
-- 按用户指定的颜色或样式识别
-- 按非公式空白格识别（风险更高，容易误迁移）
-- 按模板中的占位符文本识别
-- 不限制输入格，扫描全部可写单元格（最宽松，误匹配风险最大）
+  - 按用户指定的颜色或样式识别
+  - 按非公式空白格识别（风险更高，容易误迁移）
+  - 按模板中的占位符文本识别
+  - 不限制输入格，扫描全部可写单元格（最宽松，误匹配风险最大）
 
-**目前没有做这些扩展的计划。**
+  **目前没有做这些扩展的计划。**
 
 
 
 - **FSEC ESF 2026 v2.2.2（esf）**
 
-在通用迁移基础上额外处理：
-- `接地 Grounding` sheet 按零件名称（`norm_text` 归一化后）做行匹配，而非坐标匹配
-- 碳纤维和外壳接地行按顺序对齐
-- `备用电池箱 Spare Accumulator` 图片锚点按 2026 模板的行偏移量重定位
-- 修复已知的模板公式断裂（`总览 Overview!K19`、`其他 Others!Z32`）
-- 使用内置空白模板 `templates/fsec_esf_template_2026_v2.2.2.xlsx`
-
----
+  在通用迁移基础上额外处理：
+  - `接地 Grounding` sheet 按零件名称（`norm_text` 归一化后）做行匹配，而非坐标匹配
+  - 碳纤维和外壳接地行按顺序对齐
+  - `备用电池箱 Spare Accumulator` 图片锚点按 2026 模板的行偏移量重定位
+  - 修复已知的模板公式断裂（`总览 Overview!K19`、`其他 Others!Z32`）
+  - 使用内置空白模板 `templates/fsec_esf_template_2026_v2.2.2.xlsx`
 
 ## 高级设置
 
@@ -76,14 +74,14 @@ templates/           # 内置空白模板
 | `filter_status` | true | 过滤公式生成的 Warning/OK 等状态文本 |
 | `keep_instructional` | true | 保留模板中的图片放置提示等指导文字 |
 
----
+
 
 ## 输出
 
 - **输出 Excel**：以新模板为骨架，填入旧版中可安全确认的内容。格式、公式、合并区、数据校验保持模板原样。
 - **迁移报告**：多 sheet 的 Excel 报告，包含总览 KPI、需人工确认列表、匹配方法统计、单元格明细。
 
----
+
 
 ## 常见问题
 
@@ -95,9 +93,9 @@ templates/           # 内置空白模板
 
 - **Windows 找不到 Python？** `start.bat` 依次尝试 `py -3`、`python`、`python3`。从 [python.org](https://www.python.org/downloads/) 安装时勾选 **Add python.exe to PATH**。
 
----
 
-### 命令行
+
+## 命令行
 
 ```bash
 source .venv/bin/activate  # Windows: .venv\Scripts\activate
@@ -123,7 +121,7 @@ options:
   --keep-template-images  保留新模板中原有的图片
 ```
 
----
+
 
 ## 匹配算法
 
@@ -151,7 +149,7 @@ options:
 
 `SheetCache` 在迁移开始前对每个 worksheet 预计算并缓存：合并单元格的 top-left 映射、静态文本（非输入、非公式的单元格内容）、左侧标签、最近表头、段落标题、上下文 token 集合。所有查找均为 O(1) 或 O(n) 一次性扫描，避免在迁移循环中重复遍历 worksheet。
 
----
+
 
 ## 输出写回机制
 
@@ -164,7 +162,7 @@ openpyxl 保存 xlsx 时会丢失部分 Excel 特有的结构（空样式单元�
 3. `_ensure_ignorable_ns_declared`：检查 `mc:Ignorable` 引用的 namespace 前缀是否都有对应的 `xmlns:` 声明，缺失则注入，防止 Excel 报 corruption。
 4. `_dedup_styles`：WPS 生成的模板常含重复 `cellXfs` 条目，Excel 打开时会触发修复提示，这里在写出前去重。
 
----
+
 
 ## 依赖
 
