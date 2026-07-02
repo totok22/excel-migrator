@@ -127,6 +127,55 @@ def migrate_grounding(source_wb: Any, target_wb: Any, overwrite: bool) -> list[C
     return actions
 
 
+def _datasheet_link_payload(cell: Any) -> tuple[Any, str] | None:
+    visible_url = hyperlink_target_from_value(cell.value)
+    if visible_url:
+        return cell.value, visible_url
+    if cell.hyperlink and cell.hyperlink.target:
+        return cell.hyperlink.target, cell.hyperlink.target
+    return None
+
+
+def migrate_datasheet_links(source_wb: Any, target_wb: Any, overwrite: bool) -> list[CellAction]:
+    name = "规格书 Datasheet"
+    if name not in source_wb.sheetnames or name not in target_wb.sheetnames:
+        return []
+    source_ws = source_wb[name]
+    target_ws = target_wb[name]
+    actions: list[CellAction] = []
+
+    for tcell in target_ws._cells.values():
+        if not is_input_cell(tcell):
+            continue
+        scell = source_ws._cells.get((tcell.row, tcell.column))
+        if scell is None:
+            continue
+        payload = _datasheet_link_payload(scell)
+        if payload is None:
+            continue
+        value, url = payload
+
+        can_write_value = _can_write(tcell, overwrite)
+        same_value = tcell.value == value or tcell.value == scell.value
+        if not can_write_value and not same_value:
+            continue
+
+        changed = False
+        if can_write_value and tcell.value != value:
+            tcell.value = value
+            changed = True
+        if not tcell.hyperlink or tcell.hyperlink.target != url:
+            tcell.hyperlink = url
+            changed = True
+        if scell.comment and not tcell.comment:
+            tcell.comment = copy.copy(scell.comment)
+            changed = True
+        if changed:
+            actions.append(CellAction(name, scell.coordinate, tcell.coordinate, "datasheet-link", value))
+
+    return actions
+
+
 def grounding_image_targeter(source_ws: Any, target_ws: Any, source_img: Any) -> Any | str | None:
     """Targets used by image migration for ESF sheets."""
     from .images import image_anchor_start

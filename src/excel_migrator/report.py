@@ -94,7 +94,7 @@ def _build_summary_sheet(ws: Any, info: ReportInputs) -> None:
     ws.merge_cells("B2:F2")
 
     ws["B3"] = (
-        f"配置：{'FSEC ESF 2026 v2.2.2 专用' if info.profile == 'esf' else '通用模式'}  "
+        f"配置：{'FSEC ESF 2026 v2.2.4 专用' if info.profile == 'esf' else '通用模式'}  "
         f"｜  覆盖已有内容：{'是' if info.overwrite else '否'}  "
         f"｜  生成时间：{datetime.now().strftime('%Y-%m-%d %H:%M:%S')}  "
         f"｜  耗时：{info.elapsed_seconds:.1f}s"

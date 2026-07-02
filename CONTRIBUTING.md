@@ -10,7 +10,7 @@
 | `images.py` | 图片复制、缩放（`fit_image_to_cell`）、锚点处理 |
 | `strict.py` | XML 层写回，处理 openpyxl 与 Excel 的兼容性差异 |
 | `pipeline.py` | 流程编排：加载 → profile → 迁移 → 图片 → 写出 → 报告 |
-| `profile_esf.py` | FSEC ESF 2026 v2.2.2 专用规则 |
+| `profile_esf.py` | FSEC ESF 2026 v2.2.4 专用规则 |
 | `server.py` | stdlib `http.server` + SSE 进度推送，无第三方 web 框架 |
 | `report.py` | Excel 报告生成 |
 

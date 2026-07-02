@@ -531,6 +531,48 @@ def _fix_drawing_xml(data: bytes) -> bytes:
     return _BARE_AVLST_RE.sub(b"<a:avLst />", data)
 
 
+def _ensure_metadata_content_type(content_types_xml: bytes) -> bytes:
+    root = ET.fromstring(content_types_xml)
+    override_tag = "{http://schemas.openxmlformats.org/package/2006/content-types}Override"
+    for node in root.findall(override_tag):
+        if node.attrib.get("PartName") == "/xl/metadata.xml":
+            return content_types_xml
+    ET.SubElement(
+        root,
+        override_tag,
+        {
+            "PartName": "/xl/metadata.xml",
+            "ContentType": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheetMetadata+xml",
+        },
+    )
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
+def _ensure_metadata_relationship(workbook_rels_xml: bytes) -> bytes:
+    root = ET.fromstring(workbook_rels_xml)
+    rel_tag = "{http://schemas.openxmlformats.org/package/2006/relationships}Relationship"
+    rel_type = "http://schemas.openxmlformats.org/officeDocument/2006/relationships/sheetMetadata"
+    for node in root.findall(rel_tag):
+        if node.attrib.get("Type") == rel_type and node.attrib.get("Target") == "metadata.xml":
+            return workbook_rels_xml
+
+    used_ids: set[int] = set()
+    for node in root.findall(rel_tag):
+        rid = node.attrib.get("Id", "")
+        if rid.startswith("rId") and rid[3:].isdigit():
+            used_ids.add(int(rid[3:]))
+    next_id = 1
+    while next_id in used_ids:
+        next_id += 1
+
+    ET.SubElement(
+        root,
+        rel_tag,
+        {"Id": f"rId{next_id}", "Type": rel_type, "Target": "metadata.xml"},
+    )
+    return ET.tostring(root, encoding="utf-8", xml_declaration=True)
+
+
 def _load_shared_strings(zf: ZipFile) -> list[str] | None:
     """Load the shared strings table from an xlsx ZIP file."""
     if "xl/sharedStrings.xml" not in zf.namelist():
@@ -668,6 +710,7 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
         styles_data: bytes | None = None
         if "xl/styles.xml" in template_zip.namelist():
             styles_data = template_zip.read("xl/styles.xml")
+        has_template_metadata = "xl/metadata.xml" in template_zip.namelist()
 
         for info in staging_zip.infolist():
             data = staging_zip.read(info.filename)
@@ -687,9 +730,15 @@ def build_strict_output(template_path: Path, staging_path: Path, output_path: Pa
                     data = template_zip.read("xl/theme/theme1.xml")
             elif info.filename == "xl/workbook.xml":
                 data, name_fixes = _repair_workbook_defined_names(data)
+            elif has_template_metadata and info.filename == "[Content_Types].xml":
+                data = _ensure_metadata_content_type(data)
+            elif has_template_metadata and info.filename == "xl/_rels/workbook.xml.rels":
+                data = _ensure_metadata_relationship(data)
             elif info.filename.startswith("xl/drawings/") and info.filename.endswith(".xml"):
                 data = _fix_drawing_xml(data)
             out_zip.writestr(info, data)
+        if has_template_metadata and "xl/metadata.xml" not in staging_zip.namelist():
+            out_zip.writestr("xl/metadata.xml", template_zip.read("xl/metadata.xml"))
     return patched, name_fixes
 
 

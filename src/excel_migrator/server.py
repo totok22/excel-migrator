@@ -32,7 +32,7 @@ from . import _multipart
 
 WEB_ROOT = Path(__file__).resolve().parent.parent.parent / "web"
 PROJECT_ROOT = Path(__file__).resolve().parent.parent.parent
-DEFAULT_ESF_TEMPLATE = PROJECT_ROOT / "templates" / "fsec_esf_template_2026_v2.2.2.xlsx"
+DEFAULT_ESF_TEMPLATE = PROJECT_ROOT / "templates" / "fsec_esf_template_2026_v2.2.4.xlsx"
 WORK_ROOT = Path(tempfile.gettempdir()) / "excel-migrator-jobs"
 WORK_ROOT.mkdir(parents=True, exist_ok=True)
 

@@ -55,14 +55,14 @@ templates/           # 内置空白模板
 
 
 
-- **FSEC ESF 2026 v2.2.2（esf）**
+- **FSEC ESF 2026 v2.2.4（esf）**
 
   在通用迁移基础上额外处理：
   - `接地 Grounding` sheet 按零件名称（`norm_text` 归一化后）做行匹配，而非坐标匹配
   - 碳纤维和外壳接地行按顺序对齐
   - `备用电池箱 Spare Accumulator` 图片锚点按 2026 模板的行偏移量重定位
   - 修复已知的模板公式断裂（`总览 Overview!K19`、`其他 Others!Z32`）
-  - 使用内置空白模板 `templates/fsec_esf_template_2026_v2.2.2.xlsx`
+  - 使用内置空白模板 `templates/fsec_esf_template_2026_v2.2.4.xlsx`
 
 ## 高级设置
 
@@ -104,7 +104,7 @@ source .venv/bin/activate  # Windows: .venv\Scripts\activate
 python -m excel_migrator.cli 旧版.xlsx 新模板.xlsx -o 输出.xlsx
 
 # FSEC ESF 模式（使用内置模板）
-python -m excel_migrator.cli 旧版.xlsx templates/fsec_esf_template_2026_v2.2.2.xlsx --profile esf
+python -m excel_migrator.cli 旧版.xlsx templates/fsec_esf_template_2026_v2.2.4.xlsx --profile esf
 ```
 
 ```

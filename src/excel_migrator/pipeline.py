@@ -23,6 +23,7 @@ from .profile_esf import (
     ESF_SKIP_SHEETS,
     fix_known_template_formula_breaks,
     grounding_image_targeter,
+    migrate_datasheet_links,
     migrate_grounding,
 )
 from .report import ReportInputs, write_excel_report
@@ -136,6 +137,13 @@ def run(opts: MigrationOptions, progress: ProgressFn | None = None) -> Migration
     )
     cell_actions.extend(actions)
     skipped_cells.extend(skips)
+
+    if opts.profile == "esf":
+        link_actions = migrate_datasheet_links(source_wb, target_wb, opts.overwrite)
+        if link_actions:
+            cell_actions.extend(link_actions)
+            filled_links = {(a.sheet, a.target) for a in link_actions}
+            skipped_cells = [s for s in skipped_cells if (s.sheet, s.coord) not in filled_links]
 
     image_actions: list[ImageAction] = []
     skipped_images: list[SkippedImage] = []

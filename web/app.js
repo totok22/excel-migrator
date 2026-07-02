@@ -20,7 +20,7 @@
       area.classList.add("has-file");
       placeholder.classList.add("hidden");
       info.classList.remove("hidden");
-      info.textContent = "✓ 内置 FSEC ESF 2026 v2.2.2 空白模板";
+      info.textContent = "✓ 内置 FSEC ESF 2026 v2.2.4 空白模板";
     } else if (state.files.template) {
       area.classList.add("has-file");
       placeholder.classList.add("hidden");
